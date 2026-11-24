@@ -1,0 +1,22 @@
+# =============================================================================
+# BlazeMCLogin — unauthenticated player restrictions
+# Restrictions are removed immediately after a successful login.
+# =============================================================================
+login-restrictions:
+  enabled: true
+  freeze-player: true
+  disable-move: true
+  disable-inventory: true
+  disable-chat: true
+  disable-damage: true
+  disable-interactions: true
+  disable-drop: true
+  disable-pickup: true
+  disable-commands: true
+  teleport-to-login-spawn: false
+  allowed-commands:
+    - /login
+    - /register
+    - /l
+    - /reg
+    - /log

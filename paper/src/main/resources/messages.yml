@@ -1,0 +1,7 @@
+# Shared prefix applied to normal plugin messages.
+# The Premium auto-login line already includes this prefix; it is not duplicated.
+prefix: "&#00FB5C&lB&#17FB6B&ll&#2EFC7A&la&#46FC88&lz&#5DFC97&le&#74FDA6&lM&#8BFDB5&lC &#A2FEC4&lL&#B9FED3&lo&#D1FEE1&lg&#E8FFF0&li&#FFFFFF&ln &r&7∙ "
+
+# Optional per-key overrides. Leave empty to use the selected language file in lang/.
+# Example:
+# register.success: "&aCont creat."

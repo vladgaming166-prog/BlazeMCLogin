@@ -1,0 +1,14 @@
+{
+  "id": "blazemclogin-bridge",
+  "name": "BlazeMCLogin Velocity Bridge",
+  "version": "1.0.0",
+  "authors": ["BlazeMC Network"],
+  "description": "HMAC-signed Premium verification bridge for BlazeMCLogin",
+  "main": "net.blazemc.login.velocity.BlazeMCLoginVelocityBridge",
+  "dependencies": [
+    {
+      "id": "blazemc-connection-detector",
+      "optional": true
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+name: BlazeMCLogin
+version: ${version}
+main: net.blazemc.login.paper.BlazeMCLoginPlugin
+api-version: ${apiVersion}
+author: BlazeMC Network
+website: https://mc.blazemc.ro
+description: Production authentication for BlazeMC Network (Premium auto-login and cracked password auth)
+folia-supported: false
+load: STARTUP
+softdepend:
+  - LuckPerms
+  - PlaceholderAPI
+
+commands:
+  login:
+    description: Authenticate with your password
+    usage: /login <password>
+    aliases: [l, log]
+  register:
+    description: Register a new account
+    usage: /register <password> <confirmPassword>
+    aliases: [reg]
+  logout:
+    description: End your authenticated session
+    usage: /logout
+  changepassword:
+    description: Change your account password
+    usage: /changepassword <oldPassword> <newPassword>
+    aliases: [changepass, cp]
+  bmlogin:
+    description: BlazeMCLogin administration
+    usage: /bmlogin <subcommand>
+    aliases: [blazemclogin, bml]
+    permission: blazemclogin.admin
+
+permissions:
+  blazemclogin.admin:
+    description: All BlazeMCLogin administrative commands
+    default: op
+    children:
+      blazemclogin.reload: true
+      blazemclogin.info: true
+      blazemclogin.accounts: true
+      blazemclogin.unregister: true
+      blazemclogin.resetpassword: true
+      blazemclogin.lock: true
+      blazemclogin.session: true
+      blazemclogin.backup: true
+      blazemclogin.migrate: true
+      blazemclogin.language: true
+  blazemclogin.reload:
+    description: Reload plugin configuration
+    default: op
+  blazemclogin.info:
+    description: Inspect a player's account
+    default: op
+  blazemclogin.accounts:
+    description: List accounts associated with an IP
+    default: op
+  blazemclogin.unregister:
+    description: Delete a player account
+    default: op
+  blazemclogin.resetpassword:
+    description: Reset a player password
+    default: op
+  blazemclogin.lock:
+    description: Lock or unlock a player account
+    default: op
+  blazemclogin.session:
+    description: Inspect or invalidate sessions
+    default: op
+  blazemclogin.backup:
+    description: Create a database backup
+    default: op
+  blazemclogin.migrate:
+    description: Migrate LimboAuth accounts
+    default: op
+  blazemclogin.language:
+    description: Change the plugin language
+    default: op
+  blazemclogin.bypass.iplimit:
+    description: Bypass IP account limits
+    default: op
+  blazemclogin.bypass.login:
+    description: Skip authentication (trusted staff only)
+    default: false

@@ -1,0 +1,13 @@
+# =============================================================================
+# BlazeMCLogin — optional login spawn
+# Used only when login-restrictions.teleport-to-login-spawn is true
+# or login-spawn.enabled is true.
+# =============================================================================
+login-spawn:
+  enabled: false
+  world: world
+  x: 0.5
+  y: 80.0
+  z: 0.5
+  yaw: 0.0
+  pitch: 0.0

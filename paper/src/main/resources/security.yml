@@ -1,0 +1,30 @@
+# =============================================================================
+# BlazeMCLogin — security
+# Secrets below are generated on first start if left empty. Do not share them.
+# They are never written to logs.
+# =============================================================================
+max-login-attempts: 5
+lock-duration-seconds: 300
+login-timeout-seconds: 60
+minimum-password-length: 8
+maximum-password-length: 64
+reject-common-passwords: true
+require-complexity: false
+require-uppercase: false
+require-special-character: false
+
+rate-limit:
+  enabled: true
+  attempts-per-minute: 10
+
+password-hashing:
+  algorithm: ARGON2ID
+  memory-kib: 65536
+  iterations: 3
+  parallelism: 1
+
+secrets:
+  # HMAC key used to store IP associations. Keep stable across restarts/backups.
+  ip-hmac: ""
+  # HMAC key used to hash session identifiers.
+  session-hmac: ""
