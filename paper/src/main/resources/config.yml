@@ -1,0 +1,21 @@
+# =============================================================================
+# BlazeMCLogin — general settings
+# BlazeMC Network
+# =============================================================================
+# language:
+#   ro        — Romanian with diacritics (default)
+#   en        — English
+#   ro-ascii  — Romanian without ă, â, î, ș, ț
+# Changing this setting (or running /bmlogin language) switches every
+# player-facing string to the selected translation.
+language: ro
+
+# Extra diagnostic logging. Never logs passwords, hashes, tokens, or secrets.
+debug: false
+
+# Use the address Paper received from Velocity modern forwarding.
+# Client-supplied HTTP headers are never trusted.
+use-proxy-forwarded-address: true
+
+# Worker threads for password hashing and database I/O (never the main thread).
+async-threads: 4

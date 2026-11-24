@@ -1,0 +1,12 @@
+# =============================================================================
+# BlazeMCLogin — sessions
+# Sessions are server-side. No permanent client token is issued.
+# =============================================================================
+sessions:
+  enabled: true
+  remember-after-reconnect: true
+  expiration-minutes: 30
+  bind-to-ip: false
+  invalidate-on-ip-change: true
+  invalidate-on-password-change: true
+  prevent-multiple-sessions: false

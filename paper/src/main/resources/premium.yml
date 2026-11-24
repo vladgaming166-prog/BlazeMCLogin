@@ -1,0 +1,22 @@
+# =============================================================================
+# BlazeMCLogin — Premium auto-login
+# Requires BlazeMC Connection Detector on Velocity PLUS the BlazeMCLogin
+# Velocity bridge. Paper never classifies Premium from UUID format, IP,
+# client brand, or unsigned plugin messages.
+# =============================================================================
+premium:
+  auto-login:
+    enabled: true
+    success-message: true
+    require-verified-identity: true
+    bypass-password: true
+  bridge:
+    enabled: true
+    channel: blazemclogin:v1
+    # Maximum age of a signed verification packet.
+    max-message-age-seconds: 15
+    # How long to wait after join for a signed packet before showing /login.
+    wait-for-bridge-millis: 1500
+    # Shared HMAC-SHA256 secret. Must match velocity-bridge/config.yml.
+    # Generated on first start if empty. Copy the value to the proxy.
+    shared-secret: ""

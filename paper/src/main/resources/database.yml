@@ -1,0 +1,16 @@
+# =============================================================================
+# BlazeMCLogin — database
+# type: SQLITE | MYSQL | MARIADB
+# =============================================================================
+database:
+  type: SQLITE
+  sqlite:
+    file: accounts.db
+  mysql:
+    host: localhost
+    port: 3306
+    database: blazemclogin
+    username: root
+    password: CHANGE_ME
+    ssl: true
+    pool-size: 10
