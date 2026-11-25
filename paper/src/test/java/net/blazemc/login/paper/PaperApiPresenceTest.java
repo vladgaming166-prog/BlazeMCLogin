@@ -18,5 +18,10 @@ class PaperApiPresenceTest {
         assertNotNull(AsyncChatEvent.class);
         assertNotNull(org.bukkit.command.CommandExecutor.class);
         assertNotNull(org.bukkit.plugin.messaging.PluginMessageListener.class);
+        assertNotNull(org.bukkit.event.player.PlayerMoveEvent.class);
+        assertNotNull(org.bukkit.event.player.PlayerTeleportEvent.class);
+        assertNotNull(com.destroystokyo.paper.event.player.PlayerJumpEvent.class);
+        assertNotNull(net.kyori.adventure.sound.Sound.class);
+        assertNotNull(net.kyori.adventure.key.Key.class);
     }
 }

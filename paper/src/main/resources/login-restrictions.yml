@@ -13,6 +13,8 @@ login-restrictions:
   disable-drop: true
   disable-pickup: true
   disable-commands: true
+  # Login spawn teleport is off by default. Enabling it sends one teleport at
+  # join — never a repeating correction.
   teleport-to-login-spawn: false
   allowed-commands:
     - /login

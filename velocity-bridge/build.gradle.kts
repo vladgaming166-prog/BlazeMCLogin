@@ -3,7 +3,7 @@ plugins {
     id("com.gradleup.shadow")
 }
 
-val velocityApi = "3.4.0-SNAPSHOT"
+val velocityApi = "3.5.0-SNAPSHOT"
 
 java {
     toolchain {

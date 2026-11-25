@@ -6,7 +6,7 @@ BlazeMCLogin does **not** require LimboAuth or LimboAPI.
 
 | | |
 | --- | --- |
-| Plugin | BlazeMCLogin `1.0.0` |
+| Plugin | BlazeMCLogin `1.1.0` |
 | Commands | `/login` `/register` `/logout` `/changepassword` `/bmlogin` (`/blazemclogin`) |
 | Languages | `ro` (default), `en`, `ro-ascii` |
 | Hashing | Argon2id |
@@ -14,12 +14,12 @@ BlazeMCLogin does **not** require LimboAuth or LimboAPI.
 
 ## Download
 
-Compiled JARs (branch `cursor/blazemclogin-complete-2200`):
+Compiled JARs (branch `cursor/premium-auth-movement-2200`):
 
-- Paper 1.21.x (Java 21 runtime): https://github.com/vladgaming166-prog/BlazeMCLogin/raw/cursor/blazemclogin-complete-2200/build-output/BlazeMCLogin-Paper-1.21.x.jar
-- Paper 26.x (Java 25 runtime): https://github.com/vladgaming166-prog/BlazeMCLogin/raw/cursor/blazemclogin-complete-2200/build-output/BlazeMCLogin-Paper-26.x.jar
-- Paper 1.20.4 family (Java 17+): https://github.com/vladgaming166-prog/BlazeMCLogin/raw/cursor/blazemclogin-complete-2200/build-output/BlazeMCLogin-Paper-Legacy.jar
-- Velocity bridge: https://github.com/vladgaming166-prog/BlazeMCLogin/raw/cursor/blazemclogin-complete-2200/build-output/BlazeMCLogin-Velocity-Bridge.jar
+- Paper 1.21.x (Java 21 runtime): https://github.com/vladgaming166-prog/BlazeMCLogin/raw/cursor/premium-auth-movement-2200/build-output/BlazeMCLogin-Paper-1.21.x.jar
+- Paper 26.x (Java 25 runtime): https://github.com/vladgaming166-prog/BlazeMCLogin/raw/cursor/premium-auth-movement-2200/build-output/BlazeMCLogin-Paper-26.x.jar
+- Paper 1.20.4 family (Java 17+): https://github.com/vladgaming166-prog/BlazeMCLogin/raw/cursor/premium-auth-movement-2200/build-output/BlazeMCLogin-Paper-Legacy.jar
+- Velocity bridge: https://github.com/vladgaming166-prog/BlazeMCLogin/raw/cursor/premium-auth-movement-2200/build-output/BlazeMCLogin-Velocity-Bridge.jar
 
 Use **one** Paper JAR that matches the backend. Install the Velocity bridge on the proxy together with BlazeMC Connection Detector.
 
@@ -55,8 +55,9 @@ JARs are copied to `build-output/`.
 2. Put `BlazeMCLogin-Velocity-Bridge.jar` in Velocity `plugins/` (optional but required for Premium auto-login).
 3. Keep [BlazeMC Connection Detector](https://github.com/vladgaming166-prog/BlazeMC-Connection-Detector) on the proxy.
 4. Use Velocity **modern** forwarding. Paper must **not** be in online-mode; the proxy decides online vs offline per connection.
-5. Start once so secrets are generated. Copy `premium.bridge.shared-secret` from Paper `premium.yml` to the Velocity bridge `config.yml` (or the other way around). They must match.
+5. Leave `shared-secret` empty unless you want an override. Both sides use the Velocity modern-forwarding secret by default.
 6. Set `language` in `config.yml` to `ro`, `en`, or `ro-ascii`.
+7. Premium auto-auth, reserved-name protection, and sounds are on by default.
 
 See [docs/CONNECTION-DETECTOR.md](docs/CONNECTION-DETECTOR.md) and [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 

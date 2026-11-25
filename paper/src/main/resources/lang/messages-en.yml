@@ -1,5 +1,5 @@
 prefix: "&#00FB5C&lB&#17FB6B&ll&#2EFC7A&la&#46FC88&lz&#5DFC97&le&#74FDA6&lM&#8BFDB5&lC &#A2FEC4&lL&#B9FED3&lo&#D1FEE1&lg&#E8FFF0&li&#FFFFFF&ln &r&7∙ "
-premium.auto-login: "&#00FB5C&lB&#17FB6B&ll&#2EFC7A&la&#46FC88&lz&#5DFC97&le&#74FDA6&lM&#8BFDB5&lC &#A2FEC4&lL&#B9FED3&lo&#D1FEE1&lg&#E8FFF0&li&#FFFFFF&ln &r&7∙ Automatically logged in with premium!"
+premium.auto-login: "&#00FB5C&lB&#17FB6B&ll&#2EFC7A&la&#46FC88&lz&#5DFC97&le&#74FDA6&lM&#8BFDB5&lC &#A2FEC4&lL&#B9FED3&lo&#D1FEE1&lg&#E8FFF0&li&#FFFFFF&ln &r&7∙ &aYou have been automatically authenticated because you are using a Minecraft Premium account!"
 premium.auto-login.includes-prefix: "true"
 
 register.usage: "&7Use &f/register <password> <confirm>"
@@ -34,6 +34,12 @@ changepassword.wrong-old: "&cThe old password is incorrect."
 kick.timeout: "&cYou did not authenticate in time."
 kick.locked: "&cYour account is locked."
 kick.blacklisted: "&cThis IP address is blocked."
+kick.premium-protected: "&cThat username belongs to a Premium Minecraft account. Cracked clients cannot use it."
+kick.verification-unavailable: "&cYour session could not be verified. Reconnect and try again."
+
+premium.password-disabled: "&cPremium accounts cannot use password login."
+premium.register-disabled: "&cPremium accounts cannot use /register."
+cracked.disabled: "&cOffline-mode registration is disabled."
 
 error.player-only: "&cOnly players can use this command."
 error.no-permission: "&cYou do not have permission to do that."

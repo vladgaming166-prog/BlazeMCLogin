@@ -10,5 +10,6 @@ public enum VerificationOutcome {
     UUID_MISMATCH,
     USERNAME_MISMATCH,
     NOT_PREMIUM,
+    CRACKED_SESSION,
     TOO_EARLY
 }

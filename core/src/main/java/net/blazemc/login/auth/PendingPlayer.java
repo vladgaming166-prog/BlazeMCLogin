@@ -1,25 +1,36 @@
 package net.blazemc.login.auth;
 
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.blazemc.login.premium.PremiumVerification;
 
 public final class PendingPlayer {
+
+    public enum BridgeVerdict {
+        NONE,
+        PREMIUM,
+        CRACKED
+    }
 
     private final UUID uuid;
     private final String username;
     private final String ipHash;
     private final String normalizedIp;
     private final long joinedAt;
-    private volatile boolean authenticated;
+    private final AtomicBoolean authenticated = new AtomicBoolean(false);
+    private final AtomicBoolean workInFlight = new AtomicBoolean(false);
     private volatile boolean premiumVerified;
     private volatile AuthOutcome authSource;
     private volatile PremiumVerification premium;
+    private volatile BridgeVerdict bridgeVerdict = BridgeVerdict.NONE;
     private volatile String frozenWorld;
     private volatile double frozenX;
     private volatile double frozenY;
     private volatile double frozenZ;
     private volatile float frozenYaw;
     private volatile float frozenPitch;
+    private volatile boolean allowNextPluginTeleport;
+    private volatile long lastEmergencyCorrectionMillis;
 
     public PendingPlayer(UUID uuid, String username, String ipHash, String normalizedIp, long joinedAt) {
         this.uuid = uuid;
@@ -50,7 +61,7 @@ public final class PendingPlayer {
     }
 
     public boolean authenticated() {
-        return authenticated;
+        return authenticated.get();
     }
 
     public boolean premiumVerified() {
@@ -65,19 +76,52 @@ public final class PendingPlayer {
         return premium;
     }
 
+    public BridgeVerdict bridgeVerdict() {
+        return bridgeVerdict;
+    }
+
+    public void setBridgeVerdict(BridgeVerdict verdict) {
+        this.bridgeVerdict = verdict == null ? BridgeVerdict.NONE : verdict;
+    }
+
     public void markAuthenticated(AuthOutcome source) {
-        this.authenticated = true;
+        tryMarkAuthenticated(source);
+    }
+
+    public boolean tryMarkAuthenticated(AuthOutcome source) {
+        if (!authenticated.compareAndSet(false, true)) {
+            return false;
+        }
         this.authSource = source;
+        return true;
+    }
+
+    public boolean beginWork() {
+        return workInFlight.compareAndSet(false, true);
+    }
+
+    public void endWork() {
+        workInFlight.set(false);
+    }
+
+    public boolean workInFlight() {
+        return workInFlight.get();
     }
 
     public void markPremium(PremiumVerification verification) {
         this.premiumVerified = true;
         this.premium = verification;
+        this.bridgeVerdict = BridgeVerdict.PREMIUM;
+    }
+
+    public void markCrackedVerdict() {
+        this.bridgeVerdict = BridgeVerdict.CRACKED;
     }
 
     public void clearAuth() {
-        this.authenticated = false;
+        this.authenticated.set(false);
         this.authSource = AuthOutcome.LOGGED_OUT;
+        this.workInFlight.set(false);
     }
 
     public void freezeAt(String world, double x, double y, double z, float yaw, float pitch) {
@@ -113,7 +157,27 @@ public final class PendingPlayer {
         return frozenPitch;
     }
 
+    public void allowNextPluginTeleport() {
+        this.allowNextPluginTeleport = true;
+    }
+
+    public boolean consumePluginTeleportPermit() {
+        if (allowNextPluginTeleport) {
+            allowNextPluginTeleport = false;
+            return true;
+        }
+        return false;
+    }
+
+    public boolean canEmergencyCorrect(long now, long cooldownMillis) {
+        if (now - lastEmergencyCorrectionMillis < cooldownMillis) {
+            return false;
+        }
+        lastEmergencyCorrectionMillis = now;
+        return true;
+    }
+
     public boolean timedOut(long now, int timeoutSeconds) {
-        return !authenticated && now - joinedAt >= timeoutSeconds * 1000L;
+        return !authenticated() && now - joinedAt >= timeoutSeconds * 1000L;
     }
 }

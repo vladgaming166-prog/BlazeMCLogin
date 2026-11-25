@@ -24,8 +24,11 @@ import net.blazemc.login.paper.command.PlayerCommands;
 import net.blazemc.login.paper.listener.JoinQuitListener;
 import net.blazemc.login.paper.listener.PremiumMessageListener;
 import net.blazemc.login.paper.listener.RestrictionListener;
+import net.blazemc.login.paper.sound.AuthSoundService;
+import net.blazemc.login.premium.PremiumPacketBuffer;
 import net.blazemc.login.premium.PremiumVerifier;
 import net.blazemc.login.security.Argon2PasswordHasher;
+import net.blazemc.login.security.ForwardingSecretLocator;
 import net.blazemc.login.security.PasswordPolicy;
 import net.blazemc.login.security.SecureTokens;
 import net.blazemc.login.session.SessionService;
@@ -49,6 +52,8 @@ public final class BlazeMCLoginPlugin extends JavaPlugin {
     private IpHasher ipHasher;
     private BackupService backups;
     private AccountRepository accounts;
+    private AuthSoundService sounds;
+    private PremiumPacketBuffer premiumPackets;
 
     @Override
     public void onEnable() {
@@ -113,15 +118,21 @@ public final class BlazeMCLoginPlugin extends JavaPlugin {
         );
         AccountLimitService limits = new AccountLimitService(accounts, ipHasher);
         this.auth = new AuthService(accounts, hasher, new PasswordPolicy(settings.security()), limits, sessionService, settings);
-        this.premiumSecret = PremiumVerifier.parseSecret(settings.premium().sharedSecretHex());
+        this.premiumSecret = ForwardingSecretLocator.resolve(
+                settings.premium().sharedSecretHex(),
+                data,
+                getServer().getWorldContainer().toPath()
+        );
         this.premiumVerifier = new PremiumVerifier(Math.max(15, settings.premium().maxMessageAgeSeconds()) * 2000L);
+        this.premiumPackets = new PremiumPacketBuffer(Math.max(5_000L, settings.premium().waitForBridgeMillis() * 4L));
+        this.sounds = new AuthSoundService(this);
         this.backups = new BackupService(database);
         if (workers != null) {
             workers.close();
         }
         this.workers = new AsyncWorkers(settings.general().asyncThreads());
         if (premiumSecret.length == 0 && settings.premium().autoLoginEnabled()) {
-            getLogger().warning("Premium auto-login is enabled but the HMAC shared secret is not configured. Signed bridge messages will be rejected.");
+            getLogger().warning("Premium auto-login is enabled but no HMAC secret was found. The Velocity forwarding secret or premium.yml shared-secret is required. Values are not logged.");
         }
     }
 
@@ -183,6 +194,14 @@ public final class BlazeMCLoginPlugin extends JavaPlugin {
         return accounts;
     }
 
+    public AuthSoundService sounds() {
+        return sounds;
+    }
+
+    public PremiumPacketBuffer premiumPackets() {
+        return premiumPackets;
+    }
+
     private void bind(String name, Object executor) {
         PluginCommand command = getCommand(name);
         if (command == null) {
@@ -220,6 +239,7 @@ public final class BlazeMCLoginPlugin extends JavaPlugin {
         copyIfMissing("account-limits.yml");
         copyIfMissing("login-spawn.yml");
         copyIfMissing("login-restrictions.yml");
+        copyIfMissing("sounds.yml");
         try {
             Files.createDirectories(data.resolve("lang"));
             Files.createDirectories(data.resolve("backups"));
@@ -249,7 +269,8 @@ public final class BlazeMCLoginPlugin extends JavaPlugin {
 
     private void ensureSecrets(Path data) {
         fillSecrets(data.resolve("security.yml"), "ip-hmac:", "session-hmac:");
-        fillSecrets(data.resolve("premium.yml"), "shared-secret:");
+        // premium shared-secret stays empty on purpose so both sides can use the
+        // Velocity modern-forwarding secret already shared by the network.
     }
 
     private void fillSecrets(Path file, String... keys) {
@@ -264,7 +285,7 @@ public final class BlazeMCLoginPlugin extends JavaPlugin {
             }
             if (!filled.equals(yaml)) {
                 Files.writeString(file, filled, StandardCharsets.UTF_8);
-                getLogger().info("Generated a new secret in " + file.getFileName() + ". Copy premium shared-secret to the Velocity bridge. The value is not logged.");
+                getLogger().info("Generated a new secret in " + file.getFileName() + ". The value is not logged.");
             }
         } catch (IOException ex) {
             getLogger().log(Level.WARNING, "Unable to persist generated secrets in " + file.getFileName(), ex);

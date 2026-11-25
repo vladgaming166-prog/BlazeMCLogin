@@ -43,7 +43,7 @@ if grep -qiE "BlazeMCLogin failed to enable|Error occurred while enabling BlazeM
   grep -A 25 -i "BlazeMCLogin" "$WORKDIR/boot.log" | tail -50 >&2
   exit 1
 fi
-if grep -q "BlazeMCLogin 1.0.0 enabled" "$WORKDIR/boot.log"; then
+if grep -qE "BlazeMCLogin 1\.[0-9.]+ enabled" "$WORKDIR/boot.log"; then
   echo "SMOKE OK: plugin enabled on Paper $VERSION"
   exit 0
 fi

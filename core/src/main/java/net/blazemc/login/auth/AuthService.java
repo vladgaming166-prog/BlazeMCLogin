@@ -53,7 +53,11 @@ public final class AuthService {
 
     public PendingPlayer trackJoin(UUID uuid, String username, String ipHash, String normalizedIp, long now) {
         PendingPlayer player = new PendingPlayer(uuid, username, ipHash, normalizedIp, now);
-        online.put(uuid, player);
+        PendingPlayer previous = online.put(uuid, player);
+        if (previous != null && previous.authenticated()) {
+            // Replace the slot but do not inherit authentication from a stale connection.
+            previous.clearAuth();
+        }
         return player;
     }
 
@@ -72,39 +76,62 @@ public final class AuthService {
 
     public AuthResult handleJoin(PendingPlayer player, boolean bypassLogin, long now) {
         if (bypassLogin) {
-            player.markAuthenticated(AuthOutcome.BYPASS);
+            authenticate(player, AuthOutcome.BYPASS);
             return AuthResult.of(AuthOutcome.BYPASS);
         }
-        Optional<AccountRecord> existing = accounts.findByUuid(player.uuid())
-                .or(() -> accounts.findByUsername(player.username()));
-        if (existing.isPresent()) {
-            AccountRecord account = existing.get();
+        Optional<AccountRecord> byUuid = accounts.findByUuid(player.uuid());
+        Optional<AccountRecord> byName = accounts.findByUsername(player.username());
+        AuthResult protectedName = protectReservedName(player, byUuid, byName);
+        if (protectedName != null) {
+            return protectedName;
+        }
+        if (byUuid.isPresent()) {
+            AccountRecord account = byUuid.get();
             if (account.status() == AccountStatus.LOCKED) {
                 return AuthResult.of(AuthOutcome.ACCOUNT_LOCKED, account);
+            }
+            if (isPremiumAccount(account)) {
+                return AuthResult.of(AuthOutcome.NOT_AUTHENTICATED, account);
             }
             Optional<SessionRecord> session = sessions.restore(account, player.ipHash(), settings.sessions(), now);
             if (session.isPresent()) {
                 accounts.save(account.withLastLogin(now, player.ipHash()).withUsername(player.username()));
-                player.markAuthenticated(AuthOutcome.SESSION_RESTORED);
+                authenticate(player, AuthOutcome.SESSION_RESTORED);
                 return AuthResult.of(AuthOutcome.SESSION_RESTORED, account);
             }
+            return AuthResult.of(AuthOutcome.NOT_AUTHENTICATED, account);
         }
-        return AuthResult.of(AuthOutcome.NOT_AUTHENTICATED, existing.orElse(null));
+        return AuthResult.of(AuthOutcome.NOT_AUTHENTICATED, byName.orElse(null));
     }
 
     public AuthResult applyPremium(PendingPlayer player, PremiumVerification verification, long now) {
         if (!settings.premium().autoLoginEnabled()) {
+            if (verification != null && verification.premium()) {
+                player.markPremium(verification);
+            }
             return AuthResult.of(AuthOutcome.NOT_AUTHENTICATED);
         }
-        if (!verification.premium()) {
+        if (verification == null || !verification.premium()) {
+            if (player != null) {
+                player.markCrackedVerdict();
+            }
             return AuthResult.of(AuthOutcome.NOT_AUTHENTICATED);
         }
         if (!verification.uuid().equals(player.uuid())) {
             return AuthResult.of(AuthOutcome.NOT_AUTHENTICATED);
         }
+        if (settings.premium().requireVerifiedIdentity()
+                && !verification.username().equalsIgnoreCase(player.username())) {
+            return AuthResult.of(AuthOutcome.NOT_AUTHENTICATED);
+        }
         player.markPremium(verification);
-        Optional<AccountRecord> existing = accounts.findByUuid(player.uuid())
-                .or(() -> accounts.findByUsername(player.username()));
+        Optional<AccountRecord> existing = accounts.findByUuid(player.uuid());
+        Optional<AccountRecord> byName = accounts.findByUsername(player.username());
+        if (byName.isPresent() && existing.isEmpty() && !byName.get().uuid().equals(player.uuid())) {
+            if (isPremiumAccount(byName.get())) {
+                return AuthResult.of(AuthOutcome.PREMIUM_NAME_PROTECTED, byName.get());
+            }
+        }
         AccountRecord account;
         if (existing.isPresent()) {
             account = existing.get().withType(AccountType.PREMIUM, verification.uuid())
@@ -132,94 +159,134 @@ public final class AuthService {
         }
         accounts.save(account);
         sessions.create(account, player.ipHash(), settings.sessions(), now);
-        player.markAuthenticated(AuthOutcome.PREMIUM_AUTO_LOGIN);
+        if (!authenticate(player, AuthOutcome.PREMIUM_AUTO_LOGIN)) {
+            return AuthResult.of(AuthOutcome.ALREADY_AUTHENTICATED, account);
+        }
         return AuthResult.of(AuthOutcome.PREMIUM_AUTO_LOGIN, account);
     }
 
     public AuthResult register(PendingPlayer player, String password, String confirm, boolean bypassIp, long now) {
-        if (player.authenticated()) {
-            return AuthResult.of(AuthOutcome.ALREADY_AUTHENTICATED);
+        if (!player.beginWork()) {
+            return AuthResult.of(AuthOutcome.AUTH_IN_PROGRESS);
         }
-        if (accounts.findByUuid(player.uuid()).isPresent() || accounts.findByUsername(player.username()).isPresent()) {
-            return AuthResult.of(AuthOutcome.ALREADY_REGISTERED);
+        try {
+            if (player.authenticated()) {
+                return AuthResult.of(AuthOutcome.ALREADY_AUTHENTICATED);
+            }
+            if (player.premiumVerified() && settings.premium().disableRegistration()) {
+                return AuthResult.of(AuthOutcome.PREMIUM_REGISTER_DISABLED);
+            }
+            if (!settings.cracked().enabled() || !settings.cracked().requireRegistration()) {
+                if (!settings.cracked().enabled()) {
+                    return AuthResult.of(AuthOutcome.CRACKED_DISABLED);
+                }
+            }
+            Optional<AccountRecord> byUuid = accounts.findByUuid(player.uuid());
+            Optional<AccountRecord> byName = accounts.findByUsername(player.username());
+            AuthResult protectedName = protectReservedName(player, byUuid, byName);
+            if (protectedName != null) {
+                return protectedName;
+            }
+            if (byUuid.isPresent() || byName.isPresent()) {
+                return AuthResult.of(AuthOutcome.ALREADY_REGISTERED, byUuid.or(() -> byName).orElse(null));
+            }
+            AuthOutcome passwordIssue = mapPassword(policy.validate(password, confirm));
+            if (passwordIssue != null) {
+                return AuthResult.of(passwordIssue);
+            }
+            AccountLimitService.Decision limit = limits.checkNewRegistration(
+                    player.normalizedIp(), AccountType.CRACKED, settings.accountLimits(), bypassIp);
+            if (limit == AccountLimitService.Decision.BLACKLISTED) {
+                return AuthResult.of(AuthOutcome.IP_BLACKLISTED);
+            }
+            if (limit == AccountLimitService.Decision.LIMIT_REACHED) {
+                return AuthResult.of(AuthOutcome.IP_LIMIT);
+            }
+            String hash = hasher.hash(password.toCharArray());
+            AccountRecord account = new AccountRecord(
+                    player.uuid(),
+                    player.username(),
+                    player.username().toLowerCase(Locale.ROOT),
+                    player.premiumVerified() ? AccountType.PREMIUM : AccountType.CRACKED,
+                    hash,
+                    hasher.algorithmName(),
+                    now,
+                    now,
+                    player.ipHash(),
+                    AccountStatus.ACTIVE,
+                    1,
+                    player.premiumVerified() ? player.uuid() : null
+            );
+            accounts.save(account);
+            sessions.create(account, player.ipHash(), settings.sessions(), now);
+            attempts.clear(key(player));
+            authenticate(player, AuthOutcome.REGISTERED);
+            return AuthResult.of(AuthOutcome.REGISTERED, account);
+        } finally {
+            player.endWork();
         }
-        AuthOutcome passwordIssue = mapPassword(policy.validate(password, confirm));
-        if (passwordIssue != null) {
-            return AuthResult.of(passwordIssue);
-        }
-        AccountLimitService.Decision limit = limits.checkNewRegistration(
-                player.normalizedIp(), AccountType.CRACKED, settings.accountLimits(), bypassIp);
-        if (limit == AccountLimitService.Decision.BLACKLISTED) {
-            return AuthResult.of(AuthOutcome.IP_BLACKLISTED);
-        }
-        if (limit == AccountLimitService.Decision.LIMIT_REACHED) {
-            return AuthResult.of(AuthOutcome.IP_LIMIT);
-        }
-        String hash = hasher.hash(password.toCharArray());
-        AccountRecord account = new AccountRecord(
-                player.uuid(),
-                player.username(),
-                player.username().toLowerCase(Locale.ROOT),
-                player.premiumVerified() ? AccountType.PREMIUM : AccountType.CRACKED,
-                hash,
-                hasher.algorithmName(),
-                now,
-                now,
-                player.ipHash(),
-                AccountStatus.ACTIVE,
-                1,
-                player.premiumVerified() ? player.uuid() : null
-        );
-        accounts.save(account);
-        sessions.create(account, player.ipHash(), settings.sessions(), now);
-        attempts.clear(key(player));
-        player.markAuthenticated(AuthOutcome.REGISTERED);
-        return AuthResult.of(AuthOutcome.REGISTERED, account);
     }
 
     public AuthResult login(PendingPlayer player, String password, long now) {
-        if (player.authenticated()) {
-            return AuthResult.of(AuthOutcome.ALREADY_AUTHENTICATED);
+        if (!player.beginWork()) {
+            return AuthResult.of(AuthOutcome.AUTH_IN_PROGRESS);
         }
-        String key = key(player);
-        if (settings.security().rateLimitEnabled() && !rateLimiter.allow(key, now)) {
-            return AuthResult.of(AuthOutcome.RATE_LIMITED);
-        }
-        if (attempts.isLocked(key, now)) {
-            return AuthResult.of(AuthOutcome.ACCOUNT_LOCKED);
-        }
-        Optional<AccountRecord> existing = accounts.findByUuid(player.uuid())
-                .or(() -> accounts.findByUsername(player.username()));
-        if (existing.isEmpty()) {
-            return AuthResult.of(AuthOutcome.NOT_REGISTERED);
-        }
-        AccountRecord account = existing.get();
-        if (account.status() == AccountStatus.LOCKED) {
-            return AuthResult.of(AuthOutcome.ACCOUNT_LOCKED, account);
-        }
-        if (!account.hasPassword()) {
-            if (settings.premium().autoLoginEnabled() && player.premiumVerified() && settings.premium().bypassPassword()) {
-                return applyPremium(player, player.premium(), now);
+        try {
+            if (player.authenticated()) {
+                return AuthResult.of(AuthOutcome.ALREADY_AUTHENTICATED);
             }
-            return AuthResult.of(AuthOutcome.NOT_REGISTERED, account);
+            if (player.premiumVerified() && settings.premium().disablePasswordLogin()) {
+                return AuthResult.of(AuthOutcome.PREMIUM_PASSWORD_DISABLED);
+            }
+            String key = key(player);
+            if (settings.security().rateLimitEnabled() && !rateLimiter.allow(key, now)) {
+                return AuthResult.of(AuthOutcome.RATE_LIMITED);
+            }
+            if (attempts.isLocked(key, now)) {
+                return AuthResult.of(AuthOutcome.ACCOUNT_LOCKED);
+            }
+            Optional<AccountRecord> byUuid = accounts.findByUuid(player.uuid());
+            Optional<AccountRecord> byName = accounts.findByUsername(player.username());
+            AuthResult protectedName = protectReservedName(player, byUuid, byName);
+            if (protectedName != null) {
+                return protectedName;
+            }
+            if (byUuid.isEmpty()) {
+                return AuthResult.of(AuthOutcome.NOT_REGISTERED);
+            }
+            AccountRecord account = byUuid.get();
+            if (isPremiumAccount(account) && settings.premium().disablePasswordLogin()) {
+                return AuthResult.of(AuthOutcome.PREMIUM_PASSWORD_DISABLED, account);
+            }
+            if (account.status() == AccountStatus.LOCKED) {
+                return AuthResult.of(AuthOutcome.ACCOUNT_LOCKED, account);
+            }
+            if (!account.hasPassword()) {
+                if (settings.premium().autoLoginEnabled() && player.premiumVerified() && settings.premium().bypassPassword()) {
+                    return applyPremium(player, player.premium(), now);
+                }
+                return AuthResult.of(AuthOutcome.NOT_REGISTERED, account);
+            }
+            if (password == null || password.isEmpty()) {
+                return AuthResult.of(AuthOutcome.PASSWORD_EMPTY);
+            }
+            boolean ok = hasher.verify(password.toCharArray(), account.passwordHash());
+            if (!ok) {
+                attempts.recordFailure(key, now);
+                return AuthResult.of(AuthOutcome.WRONG_PASSWORD, account);
+            }
+            AccountRecord updated = account.withLastLogin(now, player.ipHash()).withUsername(player.username());
+            if (hasher.needsRehash(account.passwordHash())) {
+                updated = updated.withPassword(hasher.hash(password.toCharArray()), hasher.algorithmName(), account.passwordVersion());
+            }
+            accounts.save(updated);
+            sessions.create(updated, player.ipHash(), settings.sessions(), now);
+            attempts.clear(key);
+            authenticate(player, AuthOutcome.LOGGED_IN);
+            return AuthResult.of(AuthOutcome.LOGGED_IN, updated);
+        } finally {
+            player.endWork();
         }
-        if (password == null || password.isEmpty()) {
-            return AuthResult.of(AuthOutcome.PASSWORD_EMPTY);
-        }
-        boolean ok = hasher.verify(password.toCharArray(), account.passwordHash());
-        if (!ok) {
-            attempts.recordFailure(key, now);
-            return AuthResult.of(AuthOutcome.WRONG_PASSWORD, account);
-        }
-        AccountRecord updated = account.withLastLogin(now, player.ipHash()).withUsername(player.username());
-        if (hasher.needsRehash(account.passwordHash())) {
-            updated = updated.withPassword(hasher.hash(password.toCharArray()), hasher.algorithmName(), account.passwordVersion());
-        }
-        accounts.save(updated);
-        sessions.create(updated, player.ipHash(), settings.sessions(), now);
-        attempts.clear(key);
-        player.markAuthenticated(AuthOutcome.LOGGED_IN);
-        return AuthResult.of(AuthOutcome.LOGGED_IN, updated);
     }
 
     public AuthResult logout(PendingPlayer player) {
@@ -235,11 +302,17 @@ public final class AuthService {
         if (player == null || !player.authenticated()) {
             return AuthResult.of(AuthOutcome.NOT_AUTHENTICATED);
         }
+        if (player.premiumVerified() && settings.premium().disablePasswordLogin()) {
+            return AuthResult.of(AuthOutcome.PREMIUM_PASSWORD_DISABLED);
+        }
         Optional<AccountRecord> existing = accounts.findByUuid(player.uuid());
         if (existing.isEmpty()) {
             return AuthResult.of(AuthOutcome.NOT_REGISTERED);
         }
         AccountRecord account = existing.get();
+        if (isPremiumAccount(account) && settings.premium().disablePasswordLogin()) {
+            return AuthResult.of(AuthOutcome.PREMIUM_PASSWORD_DISABLED, account);
+        }
         if (account.hasPassword() && (oldPassword == null || !hasher.verify(oldPassword.toCharArray(), account.passwordHash()))) {
             return AuthResult.of(AuthOutcome.WRONG_PASSWORD, account);
         }
@@ -284,7 +357,7 @@ public final class AuthService {
     }
 
     public AuthResult setLocked(UUID uuid, boolean locked) {
-        Optional<AccountRecord> existing = accounts.findByUuid(uuid).or(() -> Optional.empty());
+        Optional<AccountRecord> existing = accounts.findByUuid(uuid);
         if (existing.isEmpty()) {
             return AuthResult.of(AuthOutcome.NOT_REGISTERED);
         }
@@ -318,6 +391,38 @@ public final class AuthService {
 
     public PluginSettings settings() {
         return settings;
+    }
+
+    public AccountLimitService limits() {
+        return limits;
+    }
+
+    private AuthResult protectReservedName(
+            PendingPlayer player,
+            Optional<AccountRecord> byUuid,
+            Optional<AccountRecord> byName
+    ) {
+        if (!settings.premium().protectReservedNames()) {
+            return null;
+        }
+        if (player.premiumVerified()) {
+            return null;
+        }
+        if (byName.isPresent() && isPremiumAccount(byName.get()) && !byName.get().uuid().equals(player.uuid())) {
+            return AuthResult.of(AuthOutcome.PREMIUM_NAME_PROTECTED, byName.get());
+        }
+        if (byUuid.isPresent() && isPremiumAccount(byUuid.get()) && !player.premiumVerified()) {
+            return AuthResult.of(AuthOutcome.PREMIUM_NAME_PROTECTED, byUuid.get());
+        }
+        return null;
+    }
+
+    private static boolean isPremiumAccount(AccountRecord account) {
+        return account.accountType() == AccountType.PREMIUM || account.premiumUuid() != null;
+    }
+
+    private boolean authenticate(PendingPlayer player, AuthOutcome source) {
+        return player.tryMarkAuthenticated(source);
     }
 
     private String key(PendingPlayer player) {

@@ -25,7 +25,7 @@ public final class PremiumMessageListener implements PluginMessageListener {
         if (!PluginConstants.CHANNEL_ID.equals(channel) && !"blazemclogin:v1".equalsIgnoreCase(channel)) {
             return;
         }
-        if (!plugin.settings().premium().bridgeEnabled() || !plugin.settings().premium().autoLoginEnabled()) {
+        if (!plugin.settings().premium().bridgeEnabled()) {
             return;
         }
         plugin.workers().database().execute(() -> handle(player, message));
@@ -33,8 +33,7 @@ public final class PremiumMessageListener implements PluginMessageListener {
 
     private void handle(Player player, byte[] message) {
         try {
-            PendingPlayer pending = plugin.auth().pending(player.getUniqueId());
-            PremiumVerifier.VerificationResult result = plugin.premiumVerifier().verify(
+            PremiumVerifier.VerificationResult result = plugin.premiumVerifier().inspect(
                     message,
                     plugin.premiumSecret(),
                     plugin.settings().premium(),
@@ -42,21 +41,37 @@ public final class PremiumMessageListener implements PluginMessageListener {
                     player.getName(),
                     System.currentTimeMillis()
             );
-            if (!result.accepted()) {
-                if (result.outcome() != VerificationOutcome.NOT_PREMIUM) {
-                    plugin.getLogger().fine("Rejected premium bridge packet for " + player.getName() + ": " + result.outcome());
+            if (result.outcome() == VerificationOutcome.MISSING_SECRET
+                    || result.outcome() == VerificationOutcome.BAD_SIGNATURE
+                    || result.outcome() == VerificationOutcome.MALFORMED
+                    || result.outcome() == VerificationOutcome.EXPIRED
+                    || result.outcome() == VerificationOutcome.REPLAY
+                    || result.outcome() == VerificationOutcome.UUID_MISMATCH
+                    || result.outcome() == VerificationOutcome.USERNAME_MISMATCH) {
+                plugin.getLogger().fine("Rejected premium bridge packet for " + player.getName() + ": " + result.outcome());
+                return;
+            }
+            PendingPlayer pending = plugin.auth().pending(player.getUniqueId());
+            if (result.outcome() == VerificationOutcome.CRACKED_SESSION) {
+                if (pending != null) {
+                    pending.markCrackedVerdict();
+                } else if (result.verification() != null) {
+                    plugin.premiumPackets().store(result.verification());
                 }
                 return;
             }
+            if (!result.accepted() || result.verification() == null) {
+                return;
+            }
             if (pending == null) {
-                // Message arrived before join tracking. Apply after a tick.
-                plugin.getServer().getScheduler().runTask(plugin, () -> plugin.workers().database().execute(() -> {
+                plugin.premiumPackets().store(result.verification());
+                plugin.getServer().getScheduler().runTaskLater(plugin, () -> plugin.workers().database().execute(() -> {
                     PendingPlayer created = plugin.auth().pending(player.getUniqueId());
                     if (created != null && !created.authenticated()) {
                         AuthResult auth = plugin.auth().applyPremium(created, result.verification(), System.currentTimeMillis());
                         plugin.getServer().getScheduler().runTask(plugin, () -> notifyPremium(player, auth));
                     }
-                }));
+                }), 1L);
                 return;
             }
             if (pending.authenticated()) {
@@ -71,11 +86,20 @@ public final class PremiumMessageListener implements PluginMessageListener {
     }
 
     private void notifyPremium(Player player, AuthResult auth) {
-        if (!player.isOnline() || !auth.authenticates()) {
+        if (!player.isOnline()) {
+            return;
+        }
+        if (auth.outcome() == net.blazemc.login.auth.AuthOutcome.PREMIUM_NAME_PROTECTED) {
+            plugin.sounds().premiumDenied(player);
+            player.kick(plugin.messages().component("kick.premium-protected", Map.of()));
+            return;
+        }
+        if (!auth.authenticates()) {
             return;
         }
         if (plugin.settings().premium().successMessage()) {
             player.sendMessage(plugin.messages().component("premium.auto-login", Map.of()));
         }
+        plugin.sounds().playOutcome(player, auth.outcome());
     }
 }

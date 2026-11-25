@@ -12,6 +12,9 @@ public final class PluginSettings {
     private volatile RestrictionSettings restrictions;
     private volatile DatabaseSettings database;
     private volatile LoginSpawnSettings loginSpawn;
+    private volatile MovementSettings movement;
+    private volatile CrackedSettings cracked;
+    private volatile SoundSettings sounds;
 
     public PluginSettings(
             GeneralSettings general,
@@ -23,6 +26,23 @@ public final class PluginSettings {
             DatabaseSettings database,
             LoginSpawnSettings loginSpawn
     ) {
+        this(general, security, premium, sessions, accountLimits, restrictions, database, loginSpawn,
+                MovementSettings.defaults(), CrackedSettings.defaults(), SoundSettings.defaults());
+    }
+
+    public PluginSettings(
+            GeneralSettings general,
+            SecuritySettings security,
+            PremiumSettings premium,
+            SessionSettings sessions,
+            AccountLimitSettings accountLimits,
+            RestrictionSettings restrictions,
+            DatabaseSettings database,
+            LoginSpawnSettings loginSpawn,
+            MovementSettings movement,
+            CrackedSettings cracked,
+            SoundSettings sounds
+    ) {
         this.general = general;
         this.security = security;
         this.premium = premium;
@@ -31,6 +51,9 @@ public final class PluginSettings {
         this.restrictions = restrictions;
         this.database = database;
         this.loginSpawn = loginSpawn;
+        this.movement = movement;
+        this.cracked = cracked;
+        this.sounds = sounds;
     }
 
     public static PluginSettings defaults() {
@@ -42,7 +65,10 @@ public final class PluginSettings {
                 AccountLimitSettings.defaults(),
                 RestrictionSettings.defaults(),
                 DatabaseSettings.defaults(),
-                LoginSpawnSettings.defaults()
+                LoginSpawnSettings.defaults(),
+                MovementSettings.defaults(),
+                CrackedSettings.defaults(),
+                SoundSettings.defaults()
         );
     }
 
@@ -78,6 +104,18 @@ public final class PluginSettings {
         return loginSpawn;
     }
 
+    public MovementSettings movement() {
+        return movement;
+    }
+
+    public CrackedSettings cracked() {
+        return cracked;
+    }
+
+    public SoundSettings sounds() {
+        return sounds;
+    }
+
     public LanguageCode language() {
         return general.language();
     }
@@ -91,5 +129,8 @@ public final class PluginSettings {
         this.restrictions = other.restrictions;
         this.database = other.database;
         this.loginSpawn = other.loginSpawn;
+        this.movement = other.movement;
+        this.cracked = other.cracked;
+        this.sounds = other.sounds;
     }
 }

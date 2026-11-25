@@ -117,6 +117,46 @@ class AuthServiceTest {
     }
 
     @Test
+    void crackedPlayerCannotStealPremiumUsernameOrUsePassword() {
+        PendingPlayer premium = join("Blaz3Craft", "10.9.9.1");
+        var verification = PremiumVerificationCodec.create(premium.uuid(), "Blaz3Craft", true, "1.1.0");
+        assertThat(auth.applyPremium(premium, verification, now()).outcome()).isEqualTo(AuthOutcome.PREMIUM_AUTO_LOGIN);
+        auth.untrack(premium.uuid());
+
+        PendingPlayer cracked = joinSameNameDifferentUuid("Blaz3Craft", "10.9.9.2");
+        assertThat(auth.handleJoin(cracked, false, now()).outcome()).isEqualTo(AuthOutcome.PREMIUM_NAME_PROTECTED);
+        assertThat(cracked.authenticated()).isFalse();
+        assertThat(auth.login(cracked, "UniquePass9x", now()).outcome()).isEqualTo(AuthOutcome.PREMIUM_NAME_PROTECTED);
+        assertThat(auth.register(cracked, "UniquePass9x", "UniquePass9x", false, now()).outcome())
+                .isEqualTo(AuthOutcome.PREMIUM_NAME_PROTECTED);
+    }
+
+    @Test
+    void premiumAccountRejectsPasswordCommands() {
+        PendingPlayer premium = join("NotchClone", "10.8.8.8");
+        var verification = PremiumVerificationCodec.create(premium.uuid(), "NotchClone", true, "1.1.0");
+        auth.applyPremium(premium, verification, now());
+        premium.clearAuth();
+        premium.markPremium(verification);
+        assertThat(auth.login(premium, "UniquePass9x", now()).outcome()).isEqualTo(AuthOutcome.PREMIUM_PASSWORD_DISABLED);
+        premium.clearAuth();
+        premium.markPremium(verification);
+        assertThat(auth.register(premium, "UniquePass9x", "UniquePass9x", false, now()).outcome())
+                .isIn(AuthOutcome.PREMIUM_REGISTER_DISABLED, AuthOutcome.ALREADY_REGISTERED);
+    }
+
+    @Test
+    void concurrentLoginIsRejectedWhileWorkIsInFlight() {
+        PendingPlayer player = join("BusyUser", "10.7.7.7");
+        auth.register(player, "UniquePass9x", "UniquePass9x", false, now());
+        auth.logout(player);
+        assertThat(player.beginWork()).isTrue();
+        assertThat(auth.login(player, "UniquePass9x", now()).outcome()).isEqualTo(AuthOutcome.AUTH_IN_PROGRESS);
+        player.endWork();
+        assertThat(auth.login(player, "UniquePass9x", now()).outcome()).isEqualTo(AuthOutcome.LOGGED_IN);
+    }
+
+    @Test
     void premiumAutoLoginRequiresSignedIdentity() {
         PendingPlayer player = join("PremiumUser", "10.2.2.2");
         var verification = PremiumVerificationCodec.create(player.uuid(), "PremiumUser", true, "1.1.0");
