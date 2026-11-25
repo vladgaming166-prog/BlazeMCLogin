@@ -96,6 +96,15 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
                         return;
                     }
                     if (result.outcome() == AuthOutcome.PREMIUM_NAME_PROTECTED) {
+                        PendingPlayer current = plugin.auth().pending(player.getUniqueId());
+                        if (current != null && current.premiumVerified()) {
+                            plugin.logAuth(player, current.authProvider(), "PREMIUM",
+                                    "PREMIUM_NAME_PROTECTED", "IGNORE", "Verified Premium player is never kicked as cracked");
+                            player.sendMessage(plugin.messages().component("premium.auto-login", Map.of()));
+                            return;
+                        }
+                        plugin.logAuth(player, current == null ? "none" : current.authProvider(), "CRACKED",
+                                "PREMIUM_NAME_PROTECTED", "KICK", "Cracked client used a reserved Premium username");
                         plugin.sounds().premiumDenied(player);
                         player.kick(plugin.messages().component("kick.premium-protected", Map.of()));
                         return;
@@ -133,7 +142,7 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
             case PREMIUM_REGISTER_DISABLED -> "premium.register-disabled";
             case VERIFICATION_UNAVAILABLE -> "kick.verification-unavailable";
             case CRACKED_DISABLED -> "cracked.disabled";
-            case AUTH_IN_PROGRESS -> "login.rate-limited";
+            case AUTH_IN_PROGRESS, AWAITING_VERIFICATION -> "login.rate-limited";
         };
     }
 

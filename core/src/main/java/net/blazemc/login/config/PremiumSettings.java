@@ -19,7 +19,7 @@ public record PremiumSettings(
         return new PremiumSettings(
                 true, true, true, true,
                 true, "blazemclogin:v1",
-                15, 2500, "",
+                15, 4000, "",
                 true, true, true, true
         );
     }

@@ -2,7 +2,7 @@
 
 This file records what was actually compiled and executed. Versions that were not tested are not claimed as tested.
 
-## Compiled API artifacts (1.1.0)
+## Compiled API artifacts (1.1.1)
 
 | Module | API Maven coordinate | Bytecode (`--release`) | Toolchain used to compile | Output JAR |
 | --- | --- | --- | --- | --- |
@@ -21,14 +21,14 @@ This project does not vendor LimboAPI. If Elytrium LimboAPI is installed on Velo
 
 ## Automated tests
 
-`./gradlew test` (1.1.0): core suite including movement guard, Premium name protection, concurrent login, HMAC/replay, forwarding-secret locator, config overlay, language packs, plus `paper-1.21:test` (`PaperApiPresenceTest` including `PlayerJumpEvent` and Adventure `Sound`).
+`./gradlew test` (1.1.1): core suite including movement guard, Premium name protection (verified Premium is not kicked as cracked), concurrent login, HMAC/replay, forwarding-secret locator, config overlay, language packs, plus `paper-1.21:test` (`PaperApiPresenceTest` and PremiumOrCracked status parsing).
 
 ## Server smoke tests
 
 | Server | Java | Plugin | Result |
 | --- | --- | --- | --- |
-| Paper 1.21.11-132 | Java 21 | 1.1.0 | Enabled, SQLite migrated, clean disable |
-| Paper 26.3-262 | Java 25 | 1.0.0 | Enabled (not re-smoked after 1.1.0) |
+| Paper 1.21.11-132 | Java 21 | 1.1.1 | Enabled, SQLite migrated, clean disable |
+| Paper 26.3-262 | Java 25 | 1.0.0 | Enabled (not re-smoked after 1.1.1) |
 | Paper 1.20.4 | — | — | API compile + unit tests only |
 | Velocity 3.5 + live Premium/cracked clients | — | — | Not run in this environment |
 | LimboAPI live transfer | — | — | Not run (optional hook compiled) |

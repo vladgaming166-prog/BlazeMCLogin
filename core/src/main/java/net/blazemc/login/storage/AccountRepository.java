@@ -68,6 +68,24 @@ public final class AccountRepository {
         }
     }
 
+    /**
+     * Frees {@code username} so a verified Premium UUID can claim it.
+     * The previous row keeps its UUID and data; only the unique name claim is vacated.
+     */
+    public void releaseUsername(String username, UUID keepUuid) {
+        Optional<AccountRecord> other = findByUsername(username);
+        if (other.isEmpty() || other.get().uuid().equals(keepUuid)) {
+            return;
+        }
+        AccountRecord record = other.get();
+        save(record.withUsernameClaim(vacatedClaim(record.uuid())));
+    }
+
+    static String vacatedClaim(UUID uuid) {
+        String hex = uuid.toString().replace("-", "");
+        return ("~" + hex).substring(0, Math.min(16, hex.length() + 1));
+    }
+
     public boolean delete(UUID uuid) {
         try (Connection connection = database.connection();
              PreparedStatement statement = connection.prepareStatement("DELETE FROM accounts WHERE uuid = ?")) {

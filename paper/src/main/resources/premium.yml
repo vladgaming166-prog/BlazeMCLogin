@@ -27,6 +27,6 @@ premium:
     max-message-age-seconds: 15
     # How long to wait after join for a signed packet before showing /login
     # or rejecting an unverified reserved name.
-    wait-for-bridge-millis: 2500
+    wait-for-bridge-millis: 4000
     # Shared HMAC-SHA256 secret. Empty = Velocity forwarding.secret.
     shared-secret: ""

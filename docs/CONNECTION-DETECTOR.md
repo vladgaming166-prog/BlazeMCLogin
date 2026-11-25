@@ -46,7 +46,11 @@ On Velocity `PreLoginEvent` the bridge looks up the username at Mojang:
 - HTTP 204/404 → cracked login is allowed
 - Transport / HTTP error → the connection is **rejected** (`reject-unverified-sessions`, default true)
 
-Paper also refuses `/login` and `/register` when the username already belongs to a Premium account in the database, even after reconnect or IP change.
+Paper waits for a **trusted session verdict** (HMAC from this bridge using `Player.isOnlineMode()`, or PremiumOrCracked on the backend) before it decides anything about a reserved name.
+
+- Verified **PREMIUM** (Connection Detector Mojang session, HMAC `premium=1`, or PremiumOrCracked `PREMIUM`) is auto-authenticated. The reserved-name kick is never applied to that player. A name already stored as Premium is not treated as proof that the current connection is cracked.
+- Verified **CRACKED** using a Premium username is rejected immediately. `/login` and `/register` stay disabled for that name.
+- If identity cannot be verified in time, reserved Premium names fail closed with the verification-unavailable kick — not the cracked reserved-name message.
 
 ## LimboAPI
 

@@ -81,9 +81,14 @@ public final class AuthService {
         }
         Optional<AccountRecord> byUuid = accounts.findByUuid(player.uuid());
         Optional<AccountRecord> byName = accounts.findByUsername(player.username());
-        AuthResult protectedName = protectReservedName(player, byUuid, byName);
-        if (protectedName != null) {
-            return protectedName;
+        // Reserved-name kicks require a verified CRACKED session. A Premium UUID
+        // reconnecting, or a join that is still waiting for Connection Detector /
+        // PremiumOrCracked, must not be treated as a cracked impersonator.
+        if (player.bridgeVerdict() == PendingPlayer.BridgeVerdict.CRACKED) {
+            AuthResult protectedName = protectReservedName(player, byUuid, byName);
+            if (protectedName != null) {
+                return protectedName;
+            }
         }
         if (byUuid.isPresent()) {
             AccountRecord account = byUuid.get();
@@ -127,10 +132,10 @@ public final class AuthService {
         player.markPremium(verification);
         Optional<AccountRecord> existing = accounts.findByUuid(player.uuid());
         Optional<AccountRecord> byName = accounts.findByUsername(player.username());
-        if (byName.isPresent() && existing.isEmpty() && !byName.get().uuid().equals(player.uuid())) {
-            if (isPremiumAccount(byName.get())) {
-                return AuthResult.of(AuthOutcome.PREMIUM_NAME_PROTECTED, byName.get());
-            }
+        if (byName.isPresent() && !byName.get().uuid().equals(player.uuid())) {
+            // The current session is verified Premium. A stored name claim is not
+            // proof that this player is cracked — free the unique name for this UUID.
+            accounts.releaseUsername(player.username(), player.uuid());
         }
         AccountRecord account;
         if (existing.isPresent()) {
@@ -405,16 +410,36 @@ public final class AuthService {
         if (!settings.premium().protectReservedNames()) {
             return null;
         }
-        if (player.premiumVerified()) {
+        if (player.premiumVerified() || player.bridgeVerdict() == PendingPlayer.BridgeVerdict.PREMIUM) {
+            return null;
+        }
+        // Same UUID as a stored Premium account: this is the owner reconnecting,
+        // not a cracked client. Wait for the trusted provider instead of kicking.
+        if (byUuid.isPresent() && isPremiumAccount(byUuid.get()) && byUuid.get().uuid().equals(player.uuid())) {
             return null;
         }
         if (byName.isPresent() && isPremiumAccount(byName.get()) && !byName.get().uuid().equals(player.uuid())) {
+            if (player.bridgeVerdict() != PendingPlayer.BridgeVerdict.CRACKED
+                    && !isPasswordAttempt(player)) {
+                return AuthResult.of(AuthOutcome.AWAITING_VERIFICATION, byName.get());
+            }
             return AuthResult.of(AuthOutcome.PREMIUM_NAME_PROTECTED, byName.get());
         }
-        if (byUuid.isPresent() && isPremiumAccount(byUuid.get()) && !player.premiumVerified()) {
-            return AuthResult.of(AuthOutcome.PREMIUM_NAME_PROTECTED, byUuid.get());
-        }
         return null;
+    }
+
+    /**
+     * Password commands are an explicit cracked-auth attempt. Join handling is not.
+     */
+    private boolean isPasswordAttempt(PendingPlayer player) {
+        return player.workInFlight();
+    }
+
+    public boolean isReservedPremiumName(String username, UUID joiningUuid) {
+        Optional<AccountRecord> byName = accounts.findByUsername(username);
+        return byName.isPresent()
+                && isPremiumAccount(byName.get())
+                && !byName.get().uuid().equals(joiningUuid);
     }
 
     private static boolean isPremiumAccount(AccountRecord account) {

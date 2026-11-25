@@ -64,7 +64,7 @@ public final class MojangProfileClient implements MinecraftProfileLookup {
             connection.setReadTimeout(readTimeoutMillis);
             connection.setInstanceFollowRedirects(false);
             connection.setRequestMethod("GET");
-            connection.setRequestProperty("User-Agent", "BlazeMCLogin/1.1.0 (BlazeMC Network)");
+            connection.setRequestProperty("User-Agent", "BlazeMCLogin/1.1.1 (BlazeMC Network)");
             connection.setRequestProperty("Accept", "application/json");
             int code = connection.getResponseCode();
             if (code == 200) {

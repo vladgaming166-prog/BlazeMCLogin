@@ -24,6 +24,7 @@ import net.blazemc.login.paper.command.PlayerCommands;
 import net.blazemc.login.paper.listener.JoinQuitListener;
 import net.blazemc.login.paper.listener.PremiumMessageListener;
 import net.blazemc.login.paper.listener.RestrictionListener;
+import net.blazemc.login.paper.premium.TrustedAuthProviders;
 import net.blazemc.login.paper.sound.AuthSoundService;
 import net.blazemc.login.premium.PremiumPacketBuffer;
 import net.blazemc.login.premium.PremiumVerifier;
@@ -54,6 +55,7 @@ public final class BlazeMCLoginPlugin extends JavaPlugin {
     private AccountRepository accounts;
     private AuthSoundService sounds;
     private PremiumPacketBuffer premiumPackets;
+    private TrustedAuthProviders trustedAuth;
 
     @Override
     public void onEnable() {
@@ -73,6 +75,9 @@ public final class BlazeMCLoginPlugin extends JavaPlugin {
             bind("bmlogin", admin);
             getServer().getScheduler().runTaskTimer(this, this::tickTimeouts, 20L, 20L);
             getLogger().info("BlazeMCLogin " + PluginConstants.VERSION + " enabled (" + settings.language().code() + ")");
+            getLogger().info("Auth providers: HMAC-bridge=" + (premiumSecret.length > 0 ? "ready" : "no-secret")
+                    + " PremiumOrCracked=" + trustedAuth.detectedPremiumOrCracked()
+                    + " PlaceholderAPI=" + (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null));
         } catch (RuntimeException | Error ex) {
             getLogger().log(Level.SEVERE, "BlazeMCLogin failed to enable", ex);
             getServer().getPluginManager().disablePlugin(this);
@@ -126,6 +131,7 @@ public final class BlazeMCLoginPlugin extends JavaPlugin {
         this.premiumVerifier = new PremiumVerifier(Math.max(15, settings.premium().maxMessageAgeSeconds()) * 2000L);
         this.premiumPackets = new PremiumPacketBuffer(Math.max(5_000L, settings.premium().waitForBridgeMillis() * 4L));
         this.sounds = new AuthSoundService(this);
+        this.trustedAuth = new TrustedAuthProviders(this);
         this.backups = new BackupService(database);
         if (workers != null) {
             workers.close();
@@ -200,6 +206,32 @@ public final class BlazeMCLoginPlugin extends JavaPlugin {
 
     public PremiumPacketBuffer premiumPackets() {
         return premiumPackets;
+    }
+
+    public TrustedAuthProviders trustedAuth() {
+        if (trustedAuth == null) {
+            trustedAuth = new TrustedAuthProviders(this);
+        }
+        return trustedAuth;
+    }
+
+    public void logAuth(org.bukkit.entity.Player player, String provider, String type, String verification, String decision, String reason) {
+        String line = "[auth] player=" + player.getName()
+                + " uuid=" + player.getUniqueId()
+                + " provider=" + provider
+                + " type=" + type
+                + " verification=" + verification
+                + " decision=" + decision
+                + " reason=" + reason;
+        if (settings != null && settings.general().debug()) {
+            getLogger().info(line);
+            return;
+        }
+        if ("KICK".equals(decision) || "AUTO_AUTH".equals(decision) || "WAIT".equals(decision)) {
+            getLogger().info(line);
+        } else {
+            getLogger().fine(line);
+        }
     }
 
     private void bind(String name, Object executor) {

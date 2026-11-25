@@ -67,7 +67,7 @@ public final class AuthSoundService {
             case PASSWORD_EMPTY, PASSWORD_TOO_SHORT, PASSWORD_TOO_LONG, PASSWORD_TOO_COMMON,
                     PASSWORD_COMPLEXITY, PASSWORD_MISMATCH, ACCOUNT_LOCKED, RATE_LIMITED,
                     IP_LIMIT, IP_BLACKLISTED, DATABASE_ERROR, VERIFICATION_UNAVAILABLE,
-                    CRACKED_DISABLED, AUTH_IN_PROGRESS -> authError(player);
+                    CRACKED_DISABLED, AUTH_IN_PROGRESS, AWAITING_VERIFICATION -> authError(player);
             default -> {
             }
         }

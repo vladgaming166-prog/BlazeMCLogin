@@ -23,6 +23,7 @@ public final class PendingPlayer {
     private volatile AuthOutcome authSource;
     private volatile PremiumVerification premium;
     private volatile BridgeVerdict bridgeVerdict = BridgeVerdict.NONE;
+    private volatile String authProvider = "none";
     private volatile String frozenWorld;
     private volatile double frozenX;
     private volatile double frozenY;
@@ -80,6 +81,14 @@ public final class PendingPlayer {
         return bridgeVerdict;
     }
 
+    public String authProvider() {
+        return authProvider;
+    }
+
+    public void setAuthProvider(String provider) {
+        this.authProvider = provider == null || provider.isBlank() ? "none" : provider;
+    }
+
     public void setBridgeVerdict(BridgeVerdict verdict) {
         this.bridgeVerdict = verdict == null ? BridgeVerdict.NONE : verdict;
     }
@@ -109,13 +118,23 @@ public final class PendingPlayer {
     }
 
     public void markPremium(PremiumVerification verification) {
+        markPremium(verification, verification == null ? "unknown" : verification.detectorVersion());
+    }
+
+    public void markPremium(PremiumVerification verification, String provider) {
         this.premiumVerified = true;
         this.premium = verification;
         this.bridgeVerdict = BridgeVerdict.PREMIUM;
+        setAuthProvider(provider);
     }
 
     public void markCrackedVerdict() {
+        markCrackedVerdict("hmac-bridge");
+    }
+
+    public void markCrackedVerdict(String provider) {
         this.bridgeVerdict = BridgeVerdict.CRACKED;
+        setAuthProvider(provider);
     }
 
     public void clearAuth() {

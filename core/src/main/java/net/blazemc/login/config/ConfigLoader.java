@@ -100,7 +100,7 @@ public final class ConfigLoader {
                 YamlSupport.boolOverlay(true, "premium.bridge.enabled", general, premium),
                 YamlSupport.stringOverlay("blazemclogin:v1", "premium.bridge.channel", general, premium),
                 YamlSupport.intOverlay(15, "premium.bridge.max-message-age-seconds", general, premium),
-                YamlSupport.intOverlay(2500, "premium.bridge.wait-for-bridge-millis", general, premium),
+                YamlSupport.intOverlay(4000, "premium.bridge.wait-for-bridge-millis", general, premium),
                 YamlSupport.stringOverlay("", "premium.bridge.shared-secret", general, premium),
                 YamlSupport.boolOverlay(true, "premium.disable-password-login", general, premium),
                 YamlSupport.boolOverlay(true, "premium.disable-registration", general, premium),

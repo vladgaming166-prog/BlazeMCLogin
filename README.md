@@ -6,7 +6,7 @@ BlazeMCLogin does **not** require LimboAuth or LimboAPI.
 
 | | |
 | --- | --- |
-| Plugin | BlazeMCLogin `1.1.0` |
+| Plugin | BlazeMCLogin `1.1.1` |
 | Commands | `/login` `/register` `/logout` `/changepassword` `/bmlogin` (`/blazemclogin`) |
 | Languages | `ro` (default), `en`, `ro-ascii` |
 | Hashing | Argon2id |

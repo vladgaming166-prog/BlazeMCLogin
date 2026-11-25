@@ -124,11 +124,46 @@ class AuthServiceTest {
         auth.untrack(premium.uuid());
 
         PendingPlayer cracked = joinSameNameDifferentUuid("Blaz3Craft", "10.9.9.2");
-        assertThat(auth.handleJoin(cracked, false, now()).outcome()).isEqualTo(AuthOutcome.PREMIUM_NAME_PROTECTED);
+        assertThat(auth.handleJoin(cracked, false, now()).outcome())
+                .isEqualTo(AuthOutcome.NOT_AUTHENTICATED);
         assertThat(cracked.authenticated()).isFalse();
+        cracked.markCrackedVerdict();
+        assertThat(auth.handleJoin(cracked, false, now()).outcome()).isEqualTo(AuthOutcome.PREMIUM_NAME_PROTECTED);
         assertThat(auth.login(cracked, "UniquePass9x", now()).outcome()).isEqualTo(AuthOutcome.PREMIUM_NAME_PROTECTED);
         assertThat(auth.register(cracked, "UniquePass9x", "UniquePass9x", false, now()).outcome())
                 .isEqualTo(AuthOutcome.PREMIUM_NAME_PROTECTED);
+    }
+
+    @Test
+    void verifiedPremiumReconnectIsNotKickedAsCrackedBeforeBridge() {
+        PendingPlayer premium = join("Blaz3Craft", "10.9.9.1");
+        var verification = PremiumVerificationCodec.create(premium.uuid(), "Blaz3Craft", true, "1.1.0");
+        assertThat(auth.applyPremium(premium, verification, now()).outcome()).isEqualTo(AuthOutcome.PREMIUM_AUTO_LOGIN);
+        UUID uuid = premium.uuid();
+        String ip = premium.ipHash();
+        auth.untrack(uuid);
+
+        PendingPlayer reconnect = auth.trackJoin(uuid, "Blaz3Craft", ip, "10.9.9.1", now());
+        assertThat(auth.handleJoin(reconnect, false, now()).outcome())
+                .isNotEqualTo(AuthOutcome.PREMIUM_NAME_PROTECTED);
+        assertThat(reconnect.authenticated()).isFalse();
+        var again = PremiumVerificationCodec.create(uuid, "Blaz3Craft", true, "1.1.0");
+        assertThat(auth.applyPremium(reconnect, again, now()).outcome()).isEqualTo(AuthOutcome.PREMIUM_AUTO_LOGIN);
+        assertThat(reconnect.authenticated()).isTrue();
+    }
+
+    @Test
+    void verifiedPremiumIsNeverRejectedBecauseNameWasReserved() {
+        PendingPlayer first = join("Blaz3Craft", "10.9.9.1");
+        var firstVerification = PremiumVerificationCodec.create(first.uuid(), "Blaz3Craft", true, "1.1.0");
+        assertThat(auth.applyPremium(first, firstVerification, now()).outcome()).isEqualTo(AuthOutcome.PREMIUM_AUTO_LOGIN);
+        auth.untrack(first.uuid());
+
+        PendingPlayer realPremium = joinSameNameDifferentUuid("Blaz3Craft", "10.8.8.8");
+        var verified = PremiumVerificationCodec.create(realPremium.uuid(), "Blaz3Craft", true, "ConnectionDetector");
+        assertThat(auth.applyPremium(realPremium, verified, now()).outcome()).isEqualTo(AuthOutcome.PREMIUM_AUTO_LOGIN);
+        assertThat(realPremium.authenticated()).isTrue();
+        assertThat(realPremium.premiumVerified()).isTrue();
     }
 
     @Test

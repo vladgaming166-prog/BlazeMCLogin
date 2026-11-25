@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 @Plugin(
         id = "blazemclogin-bridge",
         name = "BlazeMCLogin Velocity Bridge",
-        version = "1.1.0",
+        version = "1.1.1",
         authors = {"BlazeMC Network"},
         description = "Premium auto-auth, reserved-name protection, and HMAC bridge for BlazeMCLogin"
 )
@@ -73,8 +73,14 @@ public final class BlazeMCLoginVelocityBridge {
     public void onProxyInit(ProxyInitializeEvent event) {
         loadConfig();
         proxy.getChannelRegistrar().register(CHANNEL);
-        boolean detector = proxy.getPluginManager().getPlugin("blazemc-connection-detector").isPresent();
-        logger.info("BlazeMCLogin Velocity Bridge enabled. Connection Detector: {}", detector ? "detected" : "not loaded");
+        boolean detector = connectionDetectorPresent();
+        boolean premiumOrCracked = premiumOrCrackedPresent();
+        logger.info("BlazeMCLogin Velocity Bridge enabled. Connection Detector: {}, PremiumOrCracked: {}",
+                detector ? "detected" : "not loaded",
+                premiumOrCracked ? "detected" : "not loaded");
+        if (detector) {
+            logger.info("Connection Detector owns Mojang PreLogin. This bridge will send HMAC verdicts from Player.isOnlineMode() and will not override PreLogin.");
+        }
         if (secret.length == 0) {
             logger.warn("No HMAC secret resolved. Set bridge.shared-secret or rely on Velocity forwarding.secret. Premium packets will not be sent. The value is not logged.");
         }
@@ -83,6 +89,9 @@ public final class BlazeMCLoginVelocityBridge {
 
     @Subscribe
     public EventTask onPreLogin(PreLoginEvent event) {
+        if (connectionDetectorPresent()) {
+            return null;
+        }
         if (!protectReservedNames) {
             return null;
         }
@@ -147,6 +156,16 @@ public final class BlazeMCLoginVelocityBridge {
                     detectorVersion()
             );
             byte[] packet = PremiumVerificationCodec.encode(verification, secret);
+            logger.info("[auth] player={} uuid={} provider={} type={} verification={} decision={} reason={}",
+                    player.getUsername(),
+                    player.getUniqueId(),
+                    detectorVersion(),
+                    premium ? "PREMIUM" : "CRACKED",
+                    premium ? "ONLINE_MODE" : "OFFLINE_MODE",
+                    "SEND_HMAC",
+                    premium
+                            ? "Velocity isOnlineMode after Connection Detector / Mojang session"
+                            : "Offline session; cracked login flow on Paper");
             boolean sent = connection.get().sendPluginMessage(CHANNEL, packet);
             if (!sent && attempt < 6) {
                 sendVerification(player, attempt + 1);
@@ -171,7 +190,16 @@ public final class BlazeMCLoginVelocityBridge {
         return proxy.getPluginManager().getPlugin("blazemc-connection-detector")
                 .map(PluginContainer::getDescription)
                 .flatMap(desc -> desc.getVersion())
-                .orElse("none");
+                .orElse(premiumOrCrackedPresent() ? "PremiumOrCracked" : "none");
+    }
+
+    private boolean connectionDetectorPresent() {
+        return proxy.getPluginManager().getPlugin("blazemc-connection-detector").isPresent();
+    }
+
+    private boolean premiumOrCrackedPresent() {
+        return proxy.getPluginManager().getPlugin("premiumorcracked").isPresent()
+                || proxy.getPluginManager().getPlugin("PremiumOrCracked").isPresent();
     }
 
     private void loadConfig() {
