@@ -59,7 +59,12 @@ tasks.register("copyBuildOutput") {
 
 fun copyJar(projectName: String, fileName: String, out: File) {
     val libs = project(projectName).layout.buildDirectory.dir("libs").get().asFile
-    val shadow = libs.listFiles()?.firstOrNull { it.name.endsWith(".jar") && !it.name.contains("plain") && !it.name.endsWith("-sources.jar") }
+    val version = pluginVersion
+    val candidates = libs.listFiles()?.filter {
+        it.name.endsWith(".jar") && !it.name.contains("plain") && !it.name.endsWith("-sources.jar")
+    }.orEmpty()
+    val shadow = candidates.firstOrNull { it.name.contains(version) }
+        ?: candidates.maxByOrNull { it.lastModified() }
         ?: error("No shadow JAR found for $projectName in $libs")
     val dest = File(out, fileName)
     shadow.copyTo(dest, overwrite = true)

@@ -1,8 +1,11 @@
 package net.blazemc.login.paper.listener;
 
+import com.destroystokyo.paper.event.player.PlayerJumpEvent;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.blazemc.login.auth.PendingPlayer;
+import net.blazemc.login.config.MovementSettings;
 import net.blazemc.login.config.RestrictionSettings;
+import net.blazemc.login.movement.MovementGuard;
 import net.blazemc.login.paper.BlazeMCLoginPlugin;
 import net.blazemc.login.paper.PaperPlayers;
 import org.bukkit.Location;
@@ -27,8 +30,12 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerPortalEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerToggleFlightEvent;
+import org.bukkit.event.vehicle.VehicleEnterEvent;
 
 public final class RestrictionListener implements Listener {
+
+    private static final long EMERGENCY_COOLDOWN_MILLIS = 2_000L;
 
     private final BlazeMCLoginPlugin plugin;
 
@@ -41,12 +48,26 @@ public final class RestrictionListener implements Listener {
             return false;
         }
         PendingPlayer pending = plugin.auth().pending(player.getUniqueId());
-        return pending == null || !pending.authenticated();
+        return pending != null && !pending.authenticated();
     }
 
+    /**
+     * Cancel illegal walking. Do not call {@code setTo} or teleport every tick —
+     * those send position packets that desync the client and shove the player forward.
+     * Look (yaw/pitch) is preserved because look-only packets are not cancelled.
+     */
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
-        if (!blocked(event.getPlayer()) || !plugin.settings().restrictions().freezePlayer()) {
+        Player player = event.getPlayer();
+        if (!blocked(player)) {
+            return;
+        }
+        RestrictionSettings restrictions = plugin.settings().restrictions();
+        MovementSettings movement = plugin.settings().movement();
+        if (!restrictions.freezePlayer() && !restrictions.disableMove()) {
+            return;
+        }
+        if (movement.enabled() && !movement.freezeUnauthenticated()) {
             return;
         }
         Location from = event.getFrom();
@@ -54,18 +75,51 @@ public final class RestrictionListener implements Listener {
         if (to == null) {
             return;
         }
-        if (from.getBlockX() == to.getBlockX() && from.getBlockY() == to.getBlockY() && from.getBlockZ() == to.getBlockZ()) {
-            return;
+        PendingPlayer pending = plugin.auth().pending(player.getUniqueId());
+        double freezeY = pending != null ? pending.frozenY() : from.getY();
+        boolean cancel = MovementGuard.shouldCancelMove(
+                from.getX(), from.getY(), from.getZ(),
+                to.getX(), to.getY(), to.getZ(),
+                freezeY,
+                movement.maxVerticalDrift()
+        );
+        if (cancel) {
+            event.setCancelled(true);
         }
-        PendingPlayer pending = plugin.auth().pending(event.getPlayer().getUniqueId());
-        if (pending != null && pending.frozenWorld() != null) {
-            var world = plugin.getServer().getWorld(pending.frozenWorld());
-            if (world != null) {
-                event.setTo(new Location(world, pending.frozenX(), pending.frozenY(), pending.frozenZ(), pending.frozenYaw(), pending.frozenPitch()));
-                return;
+        if (pending != null && movement.preventPositionDesync()
+                && MovementGuard.needsEmergencyCorrection(
+                pending.frozenX(), pending.frozenY(), pending.frozenZ(),
+                to.getX(), to.getY(), to.getZ(),
+                movement.emergencyCorrectionBlocks())
+                && pending.canEmergencyCorrect(System.currentTimeMillis(), EMERGENCY_COOLDOWN_MILLIS)) {
+            Location freeze = freezeLocation(player, pending);
+            if (freeze != null) {
+                pending.allowNextPluginTeleport();
+                player.teleport(freeze);
             }
         }
-        event.setTo(from);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onJump(PlayerJumpEvent event) {
+        if (blocked(event.getPlayer()) && plugin.settings().restrictions().freezePlayer()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onFlight(PlayerToggleFlightEvent event) {
+        if (blocked(event.getPlayer())) {
+            event.setCancelled(true);
+            event.getPlayer().setFlying(false);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onVehicle(VehicleEnterEvent event) {
+        if (event.getEntered() instanceof Player player && blocked(player)) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
@@ -189,10 +243,28 @@ public final class RestrictionListener implements Listener {
         if (!blocked(event.getPlayer())) {
             return;
         }
-        if (event.getCause() == PlayerTeleportEvent.TeleportCause.PLUGIN
-                || event.getCause() == PlayerTeleportEvent.TeleportCause.UNKNOWN) {
+        if (!plugin.settings().movement().preventUnexpectedTeleports() && !plugin.settings().restrictions().enabled()) {
+            return;
+        }
+        PendingPlayer pending = plugin.auth().pending(event.getPlayer().getUniqueId());
+        if (pending != null && pending.consumePluginTeleportPermit()
+                && event.getCause() == PlayerTeleportEvent.TeleportCause.PLUGIN) {
             return;
         }
         event.setCancelled(true);
+    }
+
+    private static Location freezeLocation(Player player, PendingPlayer pending) {
+        if (pending.frozenWorld() == null) {
+            Location current = player.getLocation();
+            return new Location(current.getWorld(), current.getX(), current.getY(), current.getZ(),
+                    current.getYaw(), current.getPitch());
+        }
+        var world = player.getServer().getWorld(pending.frozenWorld());
+        if (world == null) {
+            world = player.getWorld();
+        }
+        return new Location(world, pending.frozenX(), pending.frozenY(), pending.frozenZ(),
+                pending.frozenYaw(), pending.frozenPitch());
     }
 }

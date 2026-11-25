@@ -1,5 +1,5 @@
 prefix: "&#00FB5C&lB&#17FB6B&ll&#2EFC7A&la&#46FC88&lz&#5DFC97&le&#74FDA6&lM&#8BFDB5&lC &#A2FEC4&lL&#B9FED3&lo&#D1FEE1&lg&#E8FFF0&li&#FFFFFF&ln &r&7∙ "
-premium.auto-login: "&#00FB5C&lB&#17FB6B&ll&#2EFC7A&la&#46FC88&lz&#5DFC97&le&#74FDA6&lM&#8BFDB5&lC &#A2FEC4&lL&#B9FED3&lo&#D1FEE1&lg&#E8FFF0&li&#FFFFFF&ln &r&7∙ Logat automat cu premium!"
+premium.auto-login: "&#00FB5C&lB&#17FB6B&ll&#2EFC7A&la&#46FC88&lz&#5DFC97&le&#74FDA6&lM&#8BFDB5&lC &#A2FEC4&lL&#B9FED3&lo&#D1FEE1&lg&#E8FFF0&li&#FFFFFF&ln &r&7∙ &aAi fost autentificat automat deoarece folosești un cont Minecraft Premium!"
 premium.auto-login.includes-prefix: "true"
 
 register.usage: "&7Folosește &f/register <parolă> <confirmare>"
@@ -34,6 +34,12 @@ changepassword.wrong-old: "&cParola veche este greșită."
 kick.timeout: "&cNu te-ai autentificat la timp."
 kick.locked: "&cContul tău este blocat."
 kick.blacklisted: "&cAceastă adresă IP este blocată."
+kick.premium-protected: "&cAcest nume aparține unui cont Minecraft Premium. Clienții cracked nu îl pot folosi."
+kick.verification-unavailable: "&cSesiunea nu a putut fi verificată. Reconectează-te și încearcă din nou."
+
+premium.password-disabled: "&cConturile Premium nu pot folosi autentificarea cu parolă."
+premium.register-disabled: "&cConturile Premium nu pot folosi /register."
+cracked.disabled: "&cÎnregistrarea în modul offline este dezactivată."
 
 error.player-only: "&cDoar jucătorii pot folosi această comandă."
 error.no-permission: "&cNu ai permisiunea pentru această acțiune."

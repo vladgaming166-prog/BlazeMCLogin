@@ -15,7 +15,8 @@ public final class ConfigLoader {
         Map<String, Object> restrictions = YamlSupport.load(dataFolder.resolve("login-restrictions.yml"));
         Map<String, Object> database = YamlSupport.load(dataFolder.resolve("database.yml"));
         Map<String, Object> spawn = YamlSupport.load(dataFolder.resolve("login-spawn.yml"));
-        return fromMaps(general, security, premium, sessions, limits, restrictions, database, spawn);
+        Map<String, Object> sounds = YamlSupport.load(dataFolder.resolve("sounds.yml"));
+        return fromMaps(general, security, premium, sessions, limits, restrictions, database, spawn, sounds);
     }
 
     public PluginSettings fromMaps(
@@ -27,6 +28,20 @@ public final class ConfigLoader {
             Map<String, Object> restrictions,
             Map<String, Object> database,
             Map<String, Object> spawn
+    ) {
+        return fromMaps(general, security, premium, sessions, limits, restrictions, database, spawn, Map.of());
+    }
+
+    public PluginSettings fromMaps(
+            Map<String, Object> general,
+            Map<String, Object> security,
+            Map<String, Object> premium,
+            Map<String, Object> sessions,
+            Map<String, Object> limits,
+            Map<String, Object> restrictions,
+            Map<String, Object> database,
+            Map<String, Object> spawn,
+            Map<String, Object> soundsFile
     ) {
         GeneralSettings generalSettings = new GeneralSettings(
                 LanguageCode.parse(YamlSupport.string(general, "language", "ro")),
@@ -76,16 +91,36 @@ public final class ConfigLoader {
             );
         }
         PremiumSettings premiumSettings = new PremiumSettings(
-                YamlSupport.bool(premium, "premium.auto-login.enabled", YamlSupport.bool(premium, "auto-login.enabled", true)),
-                YamlSupport.bool(premium, "premium.auto-login.success-message", YamlSupport.bool(premium, "auto-login.success-message", true)),
-                YamlSupport.bool(premium, "premium.auto-login.require-verified-identity", YamlSupport.bool(premium, "auto-login.require-verified-identity", true)),
-                YamlSupport.bool(premium, "premium.auto-login.bypass-password", YamlSupport.bool(premium, "auto-login.bypass-password", true)),
-                YamlSupport.bool(premium, "premium.bridge.enabled", YamlSupport.bool(premium, "bridge.enabled", true)),
-                YamlSupport.string(premium, "premium.bridge.channel", YamlSupport.string(premium, "bridge.channel", "blazemclogin:v1")),
-                YamlSupport.integer(premium, "premium.bridge.max-message-age-seconds", YamlSupport.integer(premium, "bridge.max-message-age-seconds", 15)),
-                YamlSupport.integer(premium, "premium.bridge.wait-for-bridge-millis", YamlSupport.integer(premium, "bridge.wait-for-bridge-millis", 1500)),
-                YamlSupport.string(premium, "premium.bridge.shared-secret", YamlSupport.string(premium, "bridge.shared-secret", ""))
+                YamlSupport.boolOverlay(true, "premium.auto-auth.enabled", general, premium)
+                        && YamlSupport.boolOverlay(true, "premium.auto-auth.default", general, premium)
+                        && YamlSupport.boolOverlay(true, "premium.auto-login.enabled", general, premium),
+                YamlSupport.boolOverlay(true, "premium.auto-login.success-message", general, premium),
+                YamlSupport.boolOverlay(true, "premium.auto-login.require-verified-identity", general, premium),
+                YamlSupport.boolOverlay(true, "premium.auto-login.bypass-password", general, premium),
+                YamlSupport.boolOverlay(true, "premium.bridge.enabled", general, premium),
+                YamlSupport.stringOverlay("blazemclogin:v1", "premium.bridge.channel", general, premium),
+                YamlSupport.intOverlay(15, "premium.bridge.max-message-age-seconds", general, premium),
+                YamlSupport.intOverlay(4000, "premium.bridge.wait-for-bridge-millis", general, premium),
+                YamlSupport.stringOverlay("", "premium.bridge.shared-secret", general, premium),
+                YamlSupport.boolOverlay(true, "premium.disable-password-login", general, premium),
+                YamlSupport.boolOverlay(true, "premium.disable-registration", general, premium),
+                YamlSupport.boolOverlay(true, "premium.protect-reserved-names", general, premium),
+                YamlSupport.boolOverlay(true, "premium.reject-unverified-sessions", general, premium)
         );
+        CrackedSettings crackedSettings = new CrackedSettings(
+                YamlSupport.boolOverlay(true, "cracked.enabled", general),
+                YamlSupport.boolOverlay(true, "cracked.require-login", general),
+                YamlSupport.boolOverlay(true, "cracked.require-registration", general)
+        );
+        MovementSettings movementSettings = new MovementSettings(
+                YamlSupport.boolOverlay(true, "movement.enabled", general),
+                YamlSupport.boolOverlay(true, "movement.prevent-position-desync", general),
+                YamlSupport.boolOverlay(true, "movement.prevent-unexpected-teleports", general),
+                YamlSupport.boolOverlay(true, "movement.freeze-unauthenticated", general),
+                YamlSupport.decimalOverlay(0.8, "movement.max-vertical-drift", general),
+                YamlSupport.decimalOverlay(2.5, "movement.emergency-correction-blocks", general)
+        );
+        SoundSettings soundSettings = SoundSettings.from(soundsFile == null ? Map.of() : soundsFile, general);
         SessionSettings sessionSettings = new SessionSettings(
                 YamlSupport.bool(sessions, "sessions.enabled", YamlSupport.bool(sessions, "enabled", true)),
                 YamlSupport.bool(sessions, "sessions.remember-after-reconnect", YamlSupport.bool(sessions, "remember-after-reconnect", true)),
@@ -141,6 +176,7 @@ public final class ConfigLoader {
                 (float) YamlSupport.decimal(spawn, "login-spawn.pitch", YamlSupport.decimal(spawn, "pitch", 0))
         );
         return new PluginSettings(generalSettings, securitySettings, premiumSettings, sessionSettings,
-                limitSettings, restrictionSettings, databaseSettings, spawnSettings);
+                limitSettings, restrictionSettings, databaseSettings, spawnSettings,
+                movementSettings, crackedSettings, soundSettings);
     }
 }

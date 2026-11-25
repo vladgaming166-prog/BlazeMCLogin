@@ -60,6 +60,17 @@ class PremiumVerifierTest {
     }
 
     @Test
+    void crackedSessionPacketIsNotTreatedAsPremium() {
+        PremiumVerification verification = PremiumVerificationCodec.create(uuid, "Steve", false, "1.1.0");
+        byte[] packet = PremiumVerificationCodec.encode(verification, secret);
+        PremiumVerifier.VerificationResult result = verifier.verify(packet, secret, settings, uuid, "Steve", verification.timestampMillis());
+        assertThat(result.accepted()).isFalse();
+        assertThat(result.outcome()).isEqualTo(VerificationOutcome.CRACKED_SESSION);
+        assertThat(result.verification()).isNotNull();
+        assertThat(result.verification().premium()).isFalse();
+    }
+
+    @Test
     void neverTrustsUnsignedPremiumFlagAlone() {
         PremiumVerification verification = PremiumVerificationCodec.create(uuid, "Steve", true, "1.1.0");
         byte[] packet = PremiumVerificationCodec.encode(verification, secret);

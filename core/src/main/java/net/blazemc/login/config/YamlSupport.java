@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.yaml.snakeyaml.Yaml;
 
 public final class YamlSupport {
@@ -47,6 +48,88 @@ public final class YamlSupport {
         } catch (IOException ex) {
             throw new IllegalStateException("Unable to read resource " + name, ex);
         }
+    }
+
+    public static Optional<Object> find(Map<String, Object> root, String path) {
+        if (root == null || path == null || path.isBlank()) {
+            return Optional.empty();
+        }
+        String[] parts = path.split("\\.");
+        Object current = root;
+        for (String part : parts) {
+            if (!(current instanceof Map<?, ?> map)) {
+                return Optional.empty();
+            }
+            current = map.get(part);
+            if (current == null) {
+                return Optional.empty();
+            }
+        }
+        return Optional.of(current);
+    }
+
+    @SafeVarargs
+    public static boolean boolOverlay(boolean fallback, String path, Map<String, Object>... maps) {
+        for (Map<String, Object> map : maps) {
+            Optional<Object> found = find(map, path);
+            if (found.isPresent()) {
+                return bool(Map.of("_", found.get()), "_", fallback);
+            }
+        }
+        return fallback;
+    }
+
+    @SafeVarargs
+    public static String stringOverlay(String fallback, String path, Map<String, Object>... maps) {
+        for (Map<String, Object> map : maps) {
+            Optional<Object> found = find(map, path);
+            if (found.isPresent() && found.get() != null) {
+                return String.valueOf(found.get());
+            }
+        }
+        return fallback;
+    }
+
+    @SafeVarargs
+    public static int intOverlay(int fallback, String path, Map<String, Object>... maps) {
+        for (Map<String, Object> map : maps) {
+            Optional<Object> found = find(map, path);
+            if (found.isPresent()) {
+                Object value = found.get();
+                if (value instanceof Number number) {
+                    return number.intValue();
+                }
+                if (value instanceof String text) {
+                    try {
+                        return Integer.parseInt(text.trim());
+                    } catch (NumberFormatException ignored) {
+                        return fallback;
+                    }
+                }
+            }
+        }
+        return fallback;
+    }
+
+    @SafeVarargs
+    public static double decimalOverlay(double fallback, String path, Map<String, Object>... maps) {
+        for (Map<String, Object> map : maps) {
+            Optional<Object> found = find(map, path);
+            if (found.isPresent()) {
+                Object value = found.get();
+                if (value instanceof Number number) {
+                    return number.doubleValue();
+                }
+                if (value instanceof String text) {
+                    try {
+                        return Double.parseDouble(text.trim());
+                    } catch (NumberFormatException ignored) {
+                        return fallback;
+                    }
+                }
+            }
+        }
+        return fallback;
     }
 
     public static Object value(Map<String, Object> root, String path, Object fallback) {

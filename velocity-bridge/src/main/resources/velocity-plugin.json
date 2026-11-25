@@ -1,13 +1,21 @@
 {
   "id": "blazemclogin-bridge",
   "name": "BlazeMCLogin Velocity Bridge",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "authors": ["BlazeMC Network"],
   "description": "HMAC-signed Premium verification bridge for BlazeMCLogin",
   "main": "net.blazemc.login.velocity.BlazeMCLoginVelocityBridge",
   "dependencies": [
     {
       "id": "blazemc-connection-detector",
+      "optional": true
+    },
+    {
+      "id": "limboapi",
+      "optional": true
+    },
+    {
+      "id": "premiumorcracked",
       "optional": true
     }
   ]

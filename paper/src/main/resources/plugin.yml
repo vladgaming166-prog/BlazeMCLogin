@@ -10,6 +10,7 @@ load: STARTUP
 softdepend:
   - LuckPerms
   - PlaceholderAPI
+  - PremiumOrCracked
 
 commands:
   login:

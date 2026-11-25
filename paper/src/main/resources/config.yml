@@ -19,3 +19,39 @@ use-proxy-forwarded-address: true
 
 # Worker threads for password hashing and database I/O (never the main thread).
 async-threads: 4
+
+# -----------------------------------------------------------------------------
+# Premium auto-authentication (enabled by default, no extra toggle required)
+# -----------------------------------------------------------------------------
+premium:
+  auto-auth:
+    enabled: true
+    default: true
+  auto-login:
+    enabled: true
+    success-message: true
+    require-verified-identity: true
+    bypass-password: true
+  disable-password-login: true
+  disable-registration: true
+  protect-reserved-names: true
+  reject-unverified-sessions: true
+
+# Cracked / offline-mode players still use /register and /login.
+cracked:
+  enabled: true
+  require-login: true
+  require-registration: true
+
+# Unauthenticated movement. Never teleports every tick.
+movement:
+  enabled: true
+  prevent-position-desync: true
+  prevent-unexpected-teleports: true
+  freeze-unauthenticated: true
+  max-vertical-drift: 0.8
+  emergency-correction-blocks: 2.5
+
+# Master switch; per-event sounds live in sounds.yml
+sounds:
+  enabled: true

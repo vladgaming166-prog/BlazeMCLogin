@@ -46,4 +46,9 @@ public record AccountRecord(
         return new AccountRecord(uuid, name, name.toLowerCase(), accountType, passwordHash, hashAlgorithm,
                 registeredAt, lastLoginAt, ipHash, status, passwordVersion, premiumUuid);
     }
+
+    public AccountRecord withUsernameClaim(String usernameLower) {
+        return new AccountRecord(uuid, username, usernameLower, accountType, passwordHash, hashAlgorithm,
+                registeredAt, lastLoginAt, ipHash, status, passwordVersion, premiumUuid);
+    }
 }

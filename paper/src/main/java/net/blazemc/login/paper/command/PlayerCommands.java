@@ -92,9 +92,25 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
                     if (error != null) {
                         plugin.getLogger().warning("Authentication command failed");
                         player.sendMessage(plugin.messages().component("error.database", Map.of()));
+                        plugin.sounds().authError(player);
+                        return;
+                    }
+                    if (result.outcome() == AuthOutcome.PREMIUM_NAME_PROTECTED) {
+                        PendingPlayer current = plugin.auth().pending(player.getUniqueId());
+                        if (current != null && current.premiumVerified()) {
+                            plugin.logAuth(player, current.authProvider(), "PREMIUM",
+                                    "PREMIUM_NAME_PROTECTED", "IGNORE", "Verified Premium player is never kicked as cracked");
+                            player.sendMessage(plugin.messages().component("premium.auto-login", Map.of()));
+                            return;
+                        }
+                        plugin.logAuth(player, current == null ? "none" : current.authProvider(), "CRACKED",
+                                "PREMIUM_NAME_PROTECTED", "KICK", "Cracked client used a reserved Premium username");
+                        plugin.sounds().premiumDenied(player);
+                        player.kick(plugin.messages().component("kick.premium-protected", Map.of()));
                         return;
                     }
                     player.sendMessage(plugin.messages().component(messageKey(result.outcome()), Map.of()));
+                    plugin.sounds().playOutcome(player, result.outcome());
                 }));
     }
 
@@ -121,6 +137,12 @@ public final class PlayerCommands implements CommandExecutor, TabCompleter {
             case USERNAME_TAKEN -> "register.already";
             case NOT_AUTHENTICATED -> "logout.not-logged-in";
             case DATABASE_ERROR -> "error.database";
+            case PREMIUM_NAME_PROTECTED -> "kick.premium-protected";
+            case PREMIUM_PASSWORD_DISABLED -> "premium.password-disabled";
+            case PREMIUM_REGISTER_DISABLED -> "premium.register-disabled";
+            case VERIFICATION_UNAVAILABLE -> "kick.verification-unavailable";
+            case CRACKED_DISABLED -> "cracked.disabled";
+            case AUTH_IN_PROGRESS, AWAITING_VERIFICATION -> "login.rate-limited";
         };
     }
 

@@ -45,9 +45,23 @@ public final class PremiumVerifier {
             return VerificationResult.fail(VerificationOutcome.USERNAME_MISMATCH);
         }
         if (!verification.premium()) {
-            return VerificationResult.fail(VerificationOutcome.NOT_PREMIUM);
+            return new VerificationResult(VerificationOutcome.CRACKED_SESSION, verification);
         }
         return VerificationResult.ok(verification);
+    }
+
+    /**
+     * Signature, expiry, replay and identity checks without requiring {@code premium=true}.
+     */
+    public VerificationResult inspect(
+            byte[] packet,
+            byte[] secret,
+            PremiumSettings settings,
+            UUID expectedUuid,
+            String expectedUsername,
+            long nowMillis
+    ) {
+        return verify(packet, secret, settings, expectedUuid, expectedUsername, nowMillis);
     }
 
     public static byte[] parseSecret(String hex) {

@@ -36,7 +36,8 @@ class ColorParserTest {
     void premiumAutoLoginMessageKeepsGradientAndDoesNotExposeCodes() {
         Component component = ColorParser.parse(PluginConstants.DEFAULT_PREMIUM_AUTO_LOGIN);
         String plain = PlainTextComponentSerializer.plainText().serialize(component);
-        assertThat(plain).isEqualTo("BlazeMC Login ∙ Logat automat cu premium!");
+        assertThat(plain).startsWith("BlazeMC Login ∙ ");
+        assertThat(plain).contains("Premium");
         assertThat(plain).doesNotContain("&#");
         assertThat(plain).doesNotContain("&l");
         assertThat(plain).doesNotContain("&r");
